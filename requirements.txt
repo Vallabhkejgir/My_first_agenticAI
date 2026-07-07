@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+pydantic
+langgraph
+litellm
+langchain-core
+python-dotenv
+mcp
+duckduckgo-search
+qdrant-client
+neo4j
+

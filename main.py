@@ -204,6 +204,50 @@ async def reset_state_endpoint(thread_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to reset state: {str(e)}")
 
+from fastapi.responses import HTMLResponse
+import os
+
+@app.get("/", response_class=HTMLResponse, summary="Serve the centralized dashboard UI.")
+async def root_endpoint():
+    """
+    Serves the beautiful, unified frontend dashboard single-file HTML.
+    """
+    html_path = os.path.join(os.path.dirname(__file__), "index.html")
+    if os.path.exists(html_path):
+        with open(html_path, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    else:
+        raise HTTPException(status_code=404, detail="Unified index.html file not found in the root directory.")
+
+@app.get("/memory/global/{user_id}", summary="Retrieve the global episodic and semantic memory contents for a user.")
+async def get_global_memory_endpoint(user_id: str):
+    """
+    Exposes the background global databases (Qdrant episodic summaries and LocalGraph nodes/edges) 
+    for visual inspection on the dashboard UI.
+    """
+    from memory_manager import MemoryManagerAgent, graph_store
+    try:
+        # Retrieve memories by conducting a broad semantic retrieval
+        past_vector_facts = MemoryManagerAgent.retrieve_memories(user_id=user_id, query="house blueprints lasagna cooking calculating fibonacci")
+        
+        # Pull all semantic relationship string visualizations directly from our Graph DB
+        semantic_relationships = []
+        for edge in graph_store.edges:
+            src = edge["source"]
+            tgt = edge["target"]
+            etype = edge["type"]
+            src_display = graph_store.nodes[src]["properties"].get("name", src.capitalize())
+            tgt_display = graph_store.nodes[tgt]["properties"].get("name", tgt.capitalize())
+            semantic_relationships.append(f"{src_display} -[{etype}]-> {tgt_display}")
+            
+        return {
+            "user_id": user_id,
+            "vector_memories": past_vector_facts,
+            "graph_relations": semantic_relationships
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to query global memories: {str(e)}")
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)

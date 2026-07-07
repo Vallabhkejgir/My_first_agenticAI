@@ -1,0 +1,1316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hybrid Multi-Agent Swarm Dashboard</title>
+    <style>
+        :root {
+            --bg-midnight: #0b0e14;
+            --bg-panel: #121620;
+            --bg-chat-user: #1a2233;
+            --bg-chat-agent: #1e2638;
+            --bg-tool-header: #15202e;
+            --bg-tool-body: #0d131f;
+            --accent-primary: #00f2fe;
+            --accent-research: #00f2fe;
+            --accent-execution: #bf55ec;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --border-glow: rgba(0, 242, 254, 0.15);
+            --border-color: #242f41;
+            --status-pending: #4b5563;
+            --status-active: #f59e0b;
+            --status-completed: #10b981;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-midnight);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* App Grid Layout */
+        .app-container {
+            display: grid;
+            grid-template-columns: 280px 1fr 340px;
+            width: 100%;
+            height: 100vh;
+        }
+
+        /* --- COLUMN 1: LEFT SIDEBAR (THREADS) --- */
+        .sidebar-left {
+            background-color: var(--bg-panel);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .brand-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .brand-logo {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, var(--accent-research), var(--accent-execution));
+            box-shadow: 0 0 12px var(--border-glow);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: var(--bg-midnight);
+        }
+
+        .brand-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            background: linear-gradient(to right, #00f2fe, #bf55ec);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .new-chat-btn {
+            margin: 15px 20px;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid var(--accent-primary);
+            background: rgba(0, 242, 254, 0.05);
+            color: var(--accent-primary);
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .new-chat-btn:hover {
+            background: var(--accent-primary);
+            color: var(--bg-midnight);
+            box-shadow: 0 0 15px rgba(0, 242, 254, 0.3);
+        }
+
+        .thread-section-title {
+            padding: 0 20px 8px;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            font-weight: 700;
+        }
+
+        .thread-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0 10px;
+        }
+
+        .thread-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-bottom: 5px;
+            transition: all 0.15s ease;
+            color: var(--text-muted);
+        }
+
+        .thread-item:hover, .thread-item.active {
+            background-color: var(--bg-chat-user);
+            color: var(--text-main);
+        }
+
+        .thread-item.active {
+            border-left: 3px solid var(--accent-primary);
+        }
+
+        .thread-name {
+            font-size: 0.85rem;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 170px;
+        }
+
+        .thread-delete-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.15s ease;
+        }
+
+        .thread-item:hover .thread-delete-btn {
+            opacity: 1;
+        }
+
+        .thread-delete-btn:hover {
+            color: #ef4444;
+        }
+
+        .sidebar-bottom {
+            padding: 15px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .mem-inspector-btn {
+            width: 100%;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-chat-user);
+            color: var(--text-main);
+            font-size: 0.85rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: background 0.2s ease;
+        }
+
+        .mem-inspector-btn:hover {
+            background: var(--bg-chat-agent);
+            border-color: var(--accent-execution);
+        }
+
+        /* --- COLUMN 2: CENTER PANEL (CHAT) --- */
+        .panel-center {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            background-color: var(--bg-midnight);
+            position: relative;
+        }
+
+        .chat-header {
+            height: 73px;
+            border-bottom: 1px solid var(--border-color);
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background-color: var(--bg-panel);
+        }
+
+        .chat-header-title {
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        .chat-header-status {
+            font-size: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 8px;
+            border-radius: 12px;
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--status-completed);
+        }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background-color: var(--status-completed);
+            box-shadow: 0 0 8px var(--status-completed);
+        }
+
+        .status-dot.pulsing {
+            background-color: var(--status-active);
+            box-shadow: 0 0 8px var(--status-active);
+            animation: pulse-glow 1.5s infinite alternate;
+        }
+
+        @keyframes pulse-glow {
+            from { opacity: 0.4; }
+            to { opacity: 1; }
+        }
+
+        .message-viewport {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .msg-row {
+            display: flex;
+            width: 100%;
+        }
+
+        .msg-row.user {
+            justify-content: flex-end;
+        }
+
+        .msg-row.agent {
+            justify-content: flex-start;
+        }
+
+        .msg-bubble {
+            max-width: 80%;
+            padding: 14px 18px;
+            border-radius: 12px;
+            line-height: 1.5;
+            font-size: 0.9rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        .msg-row.user .msg-bubble {
+            background-color: var(--accent-primary);
+            color: var(--bg-midnight);
+            font-weight: 500;
+            border-bottom-right-radius: 2px;
+        }
+
+        .msg-row.agent .msg-bubble {
+            background-color: var(--bg-chat-agent);
+            color: var(--text-main);
+            border-bottom-left-radius: 2px;
+            border: 1px solid var(--border-color);
+        }
+
+        .msg-bubble h3 {
+            margin-bottom: 8px;
+            font-size: 0.95rem;
+            color: var(--accent-primary);
+        }
+
+        /* --- COLLAPSIBLE TOOL BLOCKS --- */
+        .tool-block {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin: 10px 0;
+            overflow: hidden;
+            width: 100%;
+            max-width: 600px;
+            background-color: var(--bg-tool-body);
+        }
+
+        .tool-header {
+            background-color: var(--bg-tool-header);
+            padding: 10px 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            font-size: 0.8rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .tool-header:hover {
+            filter: brightness(1.1);
+        }
+
+        .tool-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tool-badge {
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.65rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .tool-badge.research {
+            background: rgba(0, 242, 254, 0.15);
+            color: var(--accent-research);
+            border: 1px solid var(--accent-research);
+        }
+
+        .tool-badge.execution {
+            background: rgba(191, 85, 236, 0.15);
+            color: var(--accent-execution);
+            border: 1px solid var(--accent-execution);
+        }
+
+        .tool-name {
+            font-weight: 600;
+            font-family: monospace;
+            color: var(--text-main);
+        }
+
+        .tool-chevron {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            transition: transform 0.2s ease;
+        }
+
+        .tool-block.expanded .tool-chevron {
+            transform: rotate(90deg);
+        }
+
+        .tool-body {
+            display: none;
+            padding: 12px;
+            font-family: 'Fira Code', monospace, Consolas, Courier;
+            font-size: 0.75rem;
+            overflow-x: auto;
+        }
+
+        .tool-block.expanded .tool-body {
+            display: block;
+        }
+
+        .tool-json-arg {
+            color: #f59e0b;
+            margin-bottom: 8px;
+            padding-bottom: 8px;
+            border-bottom: 1px dashed var(--border-color);
+        }
+
+        .tool-json-res {
+            color: #10b981;
+            white-space: pre-wrap;
+        }
+
+        /* Input Area styling */
+        .chat-input-container {
+            padding: 20px;
+            background-color: var(--bg-panel);
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .chip-container {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            padding-bottom: 2px;
+        }
+
+        .prompt-chip {
+            padding: 6px 12px;
+            border-radius: 15px;
+            background-color: var(--bg-chat-user);
+            border: 1px solid var(--border-color);
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+            color: var(--text-muted);
+        }
+
+        .prompt-chip:hover {
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+            background-color: rgba(0, 242, 254, 0.05);
+        }
+
+        .input-row {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+        }
+
+        .input-box {
+            flex: 1;
+            background-color: var(--bg-midnight);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px;
+            color: var(--text-main);
+            font-size: 0.9rem;
+            resize: none;
+            height: 48px;
+            line-height: 1.4;
+            outline: none;
+            transition: border-color 0.2s ease;
+        }
+
+        .input-box:focus {
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 10px rgba(0, 242, 254, 0.1);
+        }
+
+        .send-btn {
+            background-color: var(--accent-primary);
+            color: var(--bg-midnight);
+            border: none;
+            width: 48px;
+            height: 48px;
+            border-radius: 8px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 10px rgba(0, 242, 254, 0.2);
+        }
+
+        .send-btn:hover {
+            filter: brightness(1.1);
+            box-shadow: 0 2px 15px rgba(0, 242, 254, 0.4);
+        }
+
+        /* --- COLUMN 3: RIGHT PANEL (DASHBOARD) --- */
+        .panel-right {
+            background-color: var(--bg-panel);
+            border-left: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            overflow-y: auto;
+        }
+
+        .dashboard-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+            font-weight: 700;
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .dashboard-section {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .section-header {
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--text-muted);
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* Active Tasks list styles */
+        .task-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .task-card {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px;
+            background-color: var(--bg-midnight);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            transition: border-color 0.2s ease;
+        }
+
+        .task-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .task-team-tag {
+            font-size: 0.6rem;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 4px;
+            text-transform: uppercase;
+        }
+
+        .task-team-tag.research {
+            background: rgba(0, 242, 254, 0.1);
+            color: var(--accent-research);
+            border: 1px solid rgba(0, 242, 254, 0.2);
+        }
+
+        .task-team-tag.execution {
+            background: rgba(191, 85, 236, 0.1);
+            color: var(--accent-execution);
+            border: 1px solid rgba(191, 85, 236, 0.2);
+        }
+
+        .task-status-badge {
+            font-size: 0.6rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            padding: 2px 6px;
+            border-radius: 10px;
+        }
+
+        .task-status-badge.pending {
+            background-color: #374151;
+            color: #9ca3af;
+        }
+
+        .task-status-badge.in_progress {
+            background-color: rgba(245, 158, 11, 0.15);
+            color: var(--status-active);
+            border: 1px solid var(--status-active);
+            animation: pulse-glow 1s infinite alternate;
+        }
+
+        .task-status-badge.completed {
+            background-color: rgba(16, 185, 129, 0.15);
+            color: var(--status-completed);
+            border: 1px solid var(--status-completed);
+        }
+
+        .task-title {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        .task-desc {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            line-height: 1.3;
+        }
+
+        /* Fact log styling */
+        .fact-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .fact-item {
+            padding: 8px 12px;
+            border-radius: 6px;
+            background-color: var(--bg-midnight);
+            border-left: 2px solid var(--accent-primary);
+            font-size: 0.75rem;
+            color: var(--text-main);
+            line-height: 1.4;
+        }
+
+        /* --- GLOBAL MEMORY INSPECTOR OVERLAY PANEL --- */
+        .mem-inspector-modal {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(11, 14, 20, 0.95);
+            backdrop-filter: blur(10px);
+            z-index: 100;
+            display: none; /* Toggled on demand */
+            flex-direction: column;
+            padding: 24px;
+        }
+
+        .mem-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 15px;
+        }
+
+        .mem-modal-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--accent-primary);
+        }
+
+        .mem-close-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: color 0.15s ease;
+        }
+
+        .mem-close-btn:hover {
+            color: #ef4444;
+        }
+
+        .mem-columns {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .mem-column-card {
+            background-color: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        .mem-col-title {
+            font-size: 0.85rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--text-muted);
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .mem-col-title::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .mem-col-title.vector::before {
+            background-color: var(--accent-research);
+            box-shadow: 0 0 8px var(--accent-research);
+        }
+
+        .mem-col-title.graph::before {
+            background-color: var(--accent-execution);
+            box-shadow: 0 0 8px var(--accent-execution);
+        }
+
+        .mem-list {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .mem-item-text {
+            background-color: var(--bg-midnight);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 0.8rem;
+            line-height: 1.4;
+            color: var(--text-main);
+        }
+
+        .mem-item-text.graph-rel {
+            font-family: monospace;
+            border-left: 2px solid var(--accent-execution);
+        }
+
+        .mem-item-text.vector-fact {
+            border-left: 2px solid var(--accent-research);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- --- COLUMN 1: LEFT SIDEBAR (THREADS) --- -->
+        <aside class="sidebar-left">
+            <div class="brand-header">
+                <div class="brand-logo">S</div>
+                <div class="brand-title">SwarmAI Framework</div>
+            </div>
+
+            <button class="new-chat-btn" id="new-chat-btn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                New Swarm Session
+            </button>
+
+            <div class="thread-section-title">Active Conversations</div>
+            
+            <div class="thread-list" id="thread-list">
+                <!-- Hydrated dynamically by JS -->
+            </div>
+
+            <div class="sidebar-bottom">
+                <button class="mem-inspector-btn" id="mem-inspector-btn">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
+                    Global Memory DB
+                </button>
+            </div>
+        </aside>
+
+        <!-- --- COLUMN 2: CENTER PANEL (CONVERSATION) --- -->
+        <main class="panel-center">
+            <header class="chat-header">
+                <div>
+                    <div class="chat-header-title" id="active-thread-title">Session: default_thread</div>
+                    <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 4px;" id="active-user-title">User ID: default_user</div>
+                </div>
+                <div class="chat-header-status" id="chat-header-status">
+                    <div class="status-dot" id="status-dot"></div>
+                    <span id="status-text">Idle</span>
+                </div>
+            </header>
+
+            <!-- Scrollable Message Viewport -->
+            <div class="message-viewport" id="message-viewport">
+                <!-- Filled dynamically by state triggers -->
+                <div class="msg-row agent">
+                    <div class="msg-bubble">
+                        <h3>Welcome to the Swarm!</h3>
+                        I am the Supervisor Router. I can decompose your intents into tasks and run specialized swarms using secure E2B Python sandboxes and Model Context Protocol tools.
+                        <br><br>
+                        Click a prompt below or start typing.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom input area -->
+            <div class="chat-input-container">
+                <div class="chip-container">
+                    <button class="prompt-chip" data-prompt="I want to build a modern architectural house blueprints.">Build a Modern House</button>
+                    <button class="prompt-chip" data-prompt="Find classical lasagna culinary recipes and save findings.">Lasagna Recipe Search</button>
+                    <button class="prompt-chip" data-prompt="Write a Python script that calculates the 10th Fibonacci number in a secure sandbox VM and register it.">Run Fibonacci VM code</button>
+                </div>
+                <div class="input-row">
+                    <textarea class="input-box" id="input-box" placeholder="Decompose goal or issue dynamic command..."></textarea>
+                    <button class="send-btn" id="send-btn">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- --- GLOBAL DATABASE MEMORY INSPECTOR OVERLAY --- -->
+            <div class="mem-inspector-modal" id="mem-modal">
+                <header class="mem-modal-header">
+                    <div class="mem-modal-title">Global Multi-Tiered Memory DB Dashboard</div>
+                    <button class="mem-close-btn" id="mem-close-btn">&times;</button>
+                </header>
+                <div class="mem-columns">
+                    <!-- Qdrant Column -->
+                    <div class="mem-column-card">
+                        <div class="mem-col-title vector">Episodic Memory (Qdrant Vector DB)</div>
+                        <div class="mem-list" id="vector-mem-list">
+                            <!-- Injected by API -->
+                        </div>
+                    </div>
+                    <!-- Neo4j Column -->
+                    <div class="mem-column-card">
+                        <div class="mem-col-title graph">Semantic Memory (Neo4j Graph DB)</div>
+                        <div class="mem-list" id="graph-mem-list">
+                            <!-- Injected by API -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- --- COLUMN 3: RIGHT PANEL (DASHBOARD ACTIVE WORK) --- -->
+        <aside class="panel-right">
+            <header class="dashboard-header">
+                <span>Working Memory Status</span>
+            </header>
+
+            <!-- Task Board Area -->
+            <div class="dashboard-section" style="flex: 1; display: flex; flex-direction: column;">
+                <div class="section-header">
+                    <span>Task List (Swarm DAG)</span>
+                    <span id="task-completion-ratio" style="font-size: 0.7rem; color: var(--text-muted);">0/0 Complete</span>
+                </div>
+                <div class="task-list" id="task-list" style="overflow-y: auto; flex: 1;">
+                    <div style="font-size: 0.8rem; color: var(--text-muted); text-align: center; margin-top: 40px; font-style: italic;">
+                        No subtasks generated yet. Start a session to initialize execution graph.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Session Facts Area -->
+            <div class="dashboard-section" style="height: 300px; border-bottom: none;">
+                <div class="section-header">Active Session Facts</div>
+                <div class="fact-list" id="fact-list">
+                    <div style="font-size: 0.75rem; color: var(--text-muted); font-style: italic; text-align: center; margin-top: 20px;">
+                        No facts extracted in this turn.
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- JavaScript client layer -->
+    <script>
+        const API_BASE = window.location.origin;
+        const DEFAULT_USER = "architect_bob"; // Standard visual tester profile
+
+        // UI States
+        let threads = JSON.parse(localStorage.getItem("swarm_threads") || "[]");
+        let activeThreadId = localStorage.getItem("swarm_active_thread") || "";
+
+        // Hydrate UI references
+        const threadListEl = document.getElementById("thread-list");
+        const newChatBtn = document.getElementById("new-chat-btn");
+        const messageViewport = document.getElementById("message-viewport");
+        const inputBox = document.getElementById("input-box");
+        const sendBtn = document.getElementById("send-btn");
+        const activeThreadTitle = document.getElementById("active-thread-title");
+        const activeUserTitle = document.getElementById("active-user-title");
+        const taskListEl = document.getElementById("task-list");
+        const factListEl = document.getElementById("fact-list");
+        const taskRatioEl = document.getElementById("task-completion-ratio");
+        const statusDot = document.getElementById("status-dot");
+        const statusText = document.getElementById("status-text");
+
+        // Modal elements
+        const memInspectorBtn = document.getElementById("mem-inspector-btn");
+        const memModal = document.getElementById("mem-modal");
+        const memCloseBtn = document.getElementById("mem-close-btn");
+        const vectorMemList = document.getElementById("vector-mem-list");
+        const graphMemList = document.getElementById("graph-mem-list");
+
+        // Core Init
+        function init() {
+            if (threads.length === 0) {
+                // Initialize standard default threads
+                const initialThreadId = "session_thread_" + Math.random().toString(36).substring(2, 10);
+                threads.push({ id: initialThreadId, name: "Building Project (Demo)" });
+                activeThreadId = initialThreadId;
+                saveThreads();
+            } else if (!activeThreadId) {
+                activeThreadId = threads[0].id;
+            }
+
+            renderThreadsList();
+            loadActiveThreadState();
+            
+            // Register Event Listeners
+            newChatBtn.addEventListener("click", startNewThread);
+            sendBtn.addEventListener("click", sendMessage);
+            inputBox.addEventListener("keydown", (e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                }
+            });
+
+            // Prompt Chips trigger
+            document.querySelectorAll(".prompt-chip").forEach(chip => {
+                chip.addEventListener("click", () => {
+                    inputBox.value = chip.dataset.prompt;
+                    sendMessage();
+                });
+            });
+
+            // Memory modal open/close
+            memInspectorBtn.addEventListener("click", openMemoryInspector);
+            memCloseBtn.addEventListener("click", () => memModal.style.display = "none");
+        }
+
+        // Sidebar thread rendering
+        function renderThreadsList() {
+            threadListEl.innerHTML = "";
+            threads.forEach(t => {
+                const isActive = t.id === activeThreadId;
+                const el = document.createElement("div");
+                el.className = `thread-item ${isActive ? "active" : ""}`;
+                el.dataset.id = t.id;
+                el.innerHTML = `
+                    <div class="thread-name">${t.name}</div>
+                    <button class="thread-delete-btn" onclick="deleteThread('${t.id}', event)">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                    </button>
+                `;
+                el.addEventListener("click", () => selectThread(t.id));
+                threadListEl.appendChild(el);
+            });
+        }
+
+        function saveThreads() {
+            localStorage.setItem("swarm_threads", JSON.stringify(threads));
+            localStorage.setItem("swarm_active_thread", activeThreadId);
+        }
+
+        function startNewThread() {
+            const newId = "session_thread_" + Math.random().toString(36).substring(2, 10);
+            threads.unshift({ id: newId, name: "New Goal Swarm" });
+            activeThreadId = newId;
+            saveThreads();
+            renderThreadsList();
+            loadActiveThreadState();
+            
+            // Clean viewports immediately
+            messageViewport.innerHTML = `
+                <div class="msg-row agent">
+                    <div class="msg-bubble">
+                        <h3>New Thread Initialized!</h3>
+                        State is fresh. Set a high-level goal and I will compile tasks and execute them securely.
+                    </div>
+                </div>
+            `;
+            taskListEl.innerHTML = `
+                <div style="font-size: 0.8rem; color: var(--text-muted); text-align: center; margin-top: 40px; font-style: italic;">
+                    No subtasks generated yet.
+                </div>
+            `;
+            factListEl.innerHTML = `
+                <div style="font-size: 0.75rem; color: var(--text-muted); font-style: italic; text-align: center; margin-top: 20px;">
+                    No facts extracted in this turn.
+                </div>
+            `;
+            taskRatioEl.innerText = "0/0 Complete";
+        }
+
+        function selectThread(id) {
+            if (activeThreadId === id) return;
+            activeThreadId = id;
+            saveThreads();
+            renderThreadsList();
+            loadActiveThreadState();
+        }
+
+        async function deleteThread(id, event) {
+            event.stopPropagation();
+            if (confirm("Reset and delete this thread memory checkpoint?")) {
+                try {
+                    await fetch(`${API_BASE}/reset/${id}`, { method: "POST" });
+                } catch(e) { console.error("Resetting backend failed: ", e); }
+
+                threads = threads.filter(t => t.id !== id);
+                if (activeThreadId === id) {
+                    activeThreadId = threads.length > 0 ? threads[0].id : "";
+                }
+                saveThreads();
+                init();
+            }
+        }
+
+        // Core dynamic state loads
+        async function loadActiveThreadState() {
+            activeThreadTitle.innerText = `Session: ${activeThreadId}`;
+            activeUserTitle.innerText = `User ID: ${DEFAULT_USER}`;
+            
+            setLoaderStatus(true, "Synchronizing State...");
+            
+            try {
+                const response = await fetch(`${API_BASE}/state/${activeThreadId}`);
+                if (response.status === 404) {
+                    // Fresh state
+                    setLoaderStatus(false, "Idle");
+                    messageViewport.innerHTML = `
+                        <div class="msg-row agent">
+                            <div class="msg-bubble">
+                                <h3>Goal Orchestrator Ready</h3>
+                                Set your high-level goal (e.g. "build a house", "calculate sequence"), and the Supervisor agent will coordinate sub-agents using local memory files and code VMs!
+                            </div>
+                        </div>
+                    `;
+                    taskListEl.innerHTML = `<div style="font-size: 0.8rem; color: var(--text-muted); text-align: center; margin-top: 20px;">No active subtasks generated.</div>`;
+                    fact_list.innerHTML = "";
+                    return;
+                }
+                
+                const data = await response.json();
+                renderState(data);
+            } catch (err) {
+                console.log("No active state loaded yet. Waiting for first chat execution.");
+                messageViewport.innerHTML = `
+                    <div class="msg-row agent">
+                        <div class="msg-bubble">
+                            <h3>Welcome to SwarmAI!</h3>
+                            Submit your project request below, and the decentralized execution graph will spin up.
+                        </div>
+                    </div>
+                `;
+            } finally {
+                setLoaderStatus(false, "Idle");
+            }
+        }
+
+        // Render full API response to the dashboard elements
+        function renderState(data) {
+            // Update sidebar thread title if first time
+            const activeThread = threads.find(t => t.id === activeThreadId);
+            if (activeThread && activeThread.name === "New Goal Swarm" && data.messages.length > 1) {
+                const firstUserMsg = data.messages.find(m => m.role === "user");
+                if (firstUserMsg) {
+                    activeThread.name = firstUserMsg.content.substring(0, 25) + "...";
+                    saveThreads();
+                    renderThreadsList();
+                }
+            }
+
+            // Render Messages
+            renderConversation(data.messages);
+
+            // Render DAG Task Board
+            renderTaskBoard(data.working_memory.tasks);
+
+            // Render Fact Board
+            renderFactBoard(data.working_memory.facts);
+        }
+
+        function renderConversation(messages) {
+            messageViewport.innerHTML = "";
+            
+            let i = 0;
+            while (i < messages.length) {
+                const msg = messages[i];
+                
+                // If it's a tool-related log, attempt to build collapsible structure rather than raw bubbles
+                if (isToolExecutionLog(msg.content)) {
+                    const block = parseToolBlock(msg.content);
+                    messageViewport.appendChild(block);
+                } else {
+                    // Standard markdown message
+                    const row = document.createElement("div");
+                    row.className = `msg-row ${msg.role === 'user' ? 'user' : 'agent'}`;
+                    
+                    const formattedContent = msg.content
+                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                        .replace(/- \*\*\[(.*?)\]\*\* (.*?):/g, '<li><strong>[$1]</strong> $2:</li>')
+                        .replace(/- (.*?): (COMPLETED|PENDING|IN_PROGRESS)/g, '<li>$1: <strong style="color:var(--status-completed)">$2</strong></li>')
+                        .replace(/\n/g, '<br>');
+                        
+                    row.innerHTML = `
+                        <div class="msg-bubble">
+                            ${msg.role === 'assistant' ? `<h3>Supervisor Agent</h3>` : ''}
+                            ${formattedContent}
+                        </div>
+                    `;
+                    messageViewport.appendChild(row);
+                }
+                i++;
+            }
+            // Auto scroll to bottom
+            messageViewport.scrollTop = messageViewport.scrollHeight;
+        }
+
+        function isToolExecutionLog(text) {
+            return text.includes("Tool Call:") || text.includes("Tool '") || text.includes("Coder [Tool Call]");
+        }
+
+        function parseToolBlock(content) {
+            const container = document.createElement("div");
+            container.className = "tool-block";
+
+            let teamType = "execution";
+            let toolName = "execute_sandbox_code";
+            let rawArgs = "{ code: '...' }";
+            let rawResult = content;
+
+            if (content.includes("web_search")) {
+                teamType = "research";
+                toolName = "web_search";
+            } else if (content.includes("write_file")) {
+                toolName = "write_file";
+            } else if (content.includes("list_directory")) {
+                toolName = "list_directory";
+            } else if (content.includes("calculate_fibonacci")) {
+                toolName = "calculate_fibonacci";
+            }
+
+            // Extract JSON or snippet matching
+            const callIndex = content.indexOf("Tool Call:");
+            if (callIndex !== -1) {
+                const snippet = content.substring(callIndex);
+                const firstParen = snippet.indexOf("(");
+                const lastParen = snippet.indexOf(") -> Result:");
+                if (firstParen !== -1 && lastParen !== -1) {
+                    rawArgs = snippet.substring(firstParen + 1, lastParen);
+                    rawResult = snippet.substring(lastParen + 12);
+                }
+            }
+
+            container.innerHTML = `
+                <div class="tool-header" onclick="toggleToolBlock(this)">
+                    <div class="tool-info">
+                        <span class="tool-badge ${teamType}">${teamType} node</span>
+                        <span class="tool-name">${toolName}</span>
+                    </div>
+                    <span class="tool-chevron">&#9656;</span>
+                </div>
+                <div class="tool-body">
+                    <div class="tool-json-arg"><strong>Arguments:</strong><br>${rawArgs}</div>
+                    <div class="tool-json-res"><strong>Stdout/Result:</strong><br>${rawResult}</div>
+                </div>
+            `;
+            return container;
+        }
+
+        window.toggleToolBlock = function(headerElement) {
+            const block = headerElement.parentElement;
+            block.classList.toggle("expanded");
+        }
+
+        function renderTaskBoard(tasks) {
+            if (!tasks || tasks.length === 0) {
+                taskListEl.innerHTML = `<div style="font-size: 0.8rem; color: var(--text-muted); text-align: center; margin-top: 40px; font-style: italic;">No tasks generated.</div>`;
+                taskRatioEl.innerText = "0/0 Complete";
+                return;
+            }
+
+            taskListEl.innerHTML = "";
+            const completedCount = tasks.filter(t => t.status === "completed").length;
+            taskRatioEl.innerText = `${completedCount}/${tasks.length} Complete`;
+
+            tasks.forEach(task => {
+                const el = document.createElement("div");
+                el.className = "task-card";
+                el.innerHTML = `
+                    <div class="task-card-header">
+                        <span class="task-team-tag ${task.assigned_team.toLowerCase()}">${task.assigned_team} team</span>
+                        <span class="task-status-badge ${task.status.toLowerCase()}">${task.status.replace('_', ' ')}</span>
+                    </div>
+                    <div class="task-title">${task.title}</div>
+                    <div class="task-desc">${task.description}</div>
+                `;
+                taskListEl.appendChild(el);
+            });
+        }
+
+        function renderFactBoard(facts) {
+            if (!facts || facts.length === 0) {
+                factListEl.innerHTML = `<div style="font-size: 0.75rem; color: var(--text-muted); font-style: italic; text-align: center; margin-top: 20px;">No facts extracted.</div>`;
+                return;
+            }
+
+            factListEl.innerHTML = "";
+            facts.forEach(fact => {
+                const el = document.createElement("div");
+                el.className = "fact-item";
+                el.innerText = fact;
+                factListEl.appendChild(el);
+            });
+        }
+
+        // Send chat execution loop
+        async function sendMessage() {
+            const text = inputBox.value.trim();
+            if (!text) return;
+
+            inputBox.value = "";
+            
+            // Build temporary client user bubble for high visual feedback
+            const row = document.createElement("div");
+            row.className = "msg-row user";
+            row.innerHTML = `<div class="msg-bubble">${text}</div>`;
+            messageViewport.appendChild(row);
+            messageViewport.scrollTop = messageViewport.scrollHeight;
+
+            setLoaderStatus(true, "Executing Multi-Agent Swarm...");
+
+            try {
+                const response = await fetch(`${API_BASE}/chat`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        message: text,
+                        thread_id: activeThreadId,
+                        user_id: DEFAULT_USER,
+                        session_id: "web_session_" + activeThreadId
+                    })
+                });
+
+                if (!response.ok) throw new Error("API call returned failure code.");
+                const data = await response.json();
+                renderState(data);
+
+            } catch (err) {
+                console.error("Swarm chat failed: ", err);
+                const errRow = document.createElement("div");
+                errRow.className = "msg-row agent";
+                errRow.innerHTML = `
+                    <div class="msg-bubble" style="border-color:#ef4444">
+                        <h3 style="color:#ef4444">Graph Connection Timeout</h3>
+                        Failed to reach active LangGraph checkpointer. Verify FastAPI backend server is running on localhost.
+                    </div>
+                `;
+                messageViewport.appendChild(errRow);
+            } finally {
+                setLoaderStatus(false, "Idle");
+            }
+        }
+
+        function setLoaderStatus(loading, label) {
+            statusText.innerText = label;
+            if (loading) {
+                statusDot.className = "status-dot pulsing";
+                sendBtn.disabled = true;
+                sendBtn.style.opacity = 0.5;
+            } else {
+                statusDot.className = "status-dot";
+                sendBtn.disabled = false;
+                sendBtn.style.opacity = 1;
+            }
+        }
+
+        // Dynamic modal memory inspection view
+        async function openMemoryInspector() {
+            memModal.style.display = "flex";
+            vectorMemList.innerHTML = `<div style="color:var(--accent-research); text-align:center; padding-top:40px;">Querying Qdrant...</div>`;
+            graphMemList.innerHTML = `<div style="color:var(--accent-execution); text-align:center; padding-top:40px;">Querying Semantic Graph...</div>`;
+            
+            try {
+                const res = await fetch(`${API_BASE}/memory/global/${DEFAULT_USER}`);
+                const data = await res.json();
+
+                // Hydrate vector Qdrant list
+                vectorMemList.innerHTML = "";
+                if (!data.vector_memories || data.vector_memories.length === 0) {
+                    vectorMemList.innerHTML = `<div style="font-size:0.75rem; color:var(--text-muted); text-align:center; margin-top:40px;">No episodic summaries stored in Qdrant for this user yet. Finish a task session to trigger background indexing!</div>`;
+                } else {
+                    data.vector_memories.forEach(fact => {
+                        const el = document.createElement("div");
+                        el.className = "mem-item-text vector-fact";
+                        el.innerText = fact;
+                        vectorMemList.appendChild(el);
+                    });
+                }
+
+                // Hydrate semantic graph relations list
+                graphMemList.innerHTML = "";
+                if (!data.graph_relations || data.graph_relations.length === 0) {
+                    graphMemList.innerHTML = `<div style="font-size:0.75rem; color:var(--text-muted); text-align:center; margin-top:40px;">No semantic nodes/relationships extracted yet.</div>`;
+                } else {
+                    data.graph_relations.forEach(rel => {
+                        const el = document.createElement("div");
+                        el.className = "mem-item-text graph-rel";
+                        el.innerText = `neo4j://MATCH path = ${rel} RETURN path`;
+                        graphMemList.appendChild(el);
+                    });
+                }
+
+            } catch (err) {
+                vectorMemList.innerHTML = `<div style="color:#ef4444; font-size:0.8rem;">Failed to fetch vector database.</div>`;
+                graphMemList.innerHTML = `<div style="color:#ef4444; font-size:0.8rem;">Failed to fetch graph relationships.</div>`;
+            }
+        }
+
+        // Run
+        init();
+    </script>
+</body>
+</html>

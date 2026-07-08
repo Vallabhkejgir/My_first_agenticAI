@@ -201,8 +201,10 @@
             display: flex;
             flex-direction: column;
             height: 100%;
+            min-height: 0;
             background-color: var(--bg-midnight);
             position: relative;
+            overflow: hidden;
         }
 
         .chat-header {
@@ -218,6 +220,32 @@
         .chat-header-title {
             font-weight: 600;
             font-size: 0.95rem;
+        }
+
+        .chat-header-tabs {
+            display: flex;
+            gap: 10px;
+        }
+
+        .chat-tab-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            padding: 6px 12px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s ease;
+        }
+
+        .chat-tab-btn:hover {
+            color: var(--text-main);
+        }
+
+        .chat-tab-btn.active {
+            color: var(--accent-primary);
+            border-bottom: 2px solid var(--accent-primary);
         }
 
         .chat-header-status {
@@ -252,11 +280,13 @@
 
         .message-viewport {
             flex: 1;
-            overflow-y: auto;
+            min-height: 0;
+            overflow-y: scroll;
             padding: 20px;
             display: flex;
             flex-direction: column;
             gap: 20px;
+            scroll-behavior: smooth;
         }
 
         .msg-row {
@@ -482,7 +512,9 @@
             display: flex;
             flex-direction: column;
             height: 100%;
+            min-height: 0;
             overflow-y: auto;
+            overflow-x: hidden;
         }
 
         .dashboard-header {
@@ -517,6 +549,7 @@
             display: flex;
             flex-direction: column;
             gap: 10px;
+            overflow-y: auto;
         }
 
         .task-card {
@@ -599,7 +632,6 @@
             display: flex;
             flex-direction: column;
             gap: 8px;
-            max-height: 200px;
             overflow-y: auto;
         }
 
@@ -771,14 +803,18 @@
                     <div class="chat-header-title" id="active-thread-title">Session: default_thread</div>
                     <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 4px;" id="active-user-title">User ID: default_user</div>
                 </div>
+                <div class="chat-header-tabs">
+                    <button class="chat-tab-btn active" id="tab-btn-chat" onclick="switchTab('chat')">Conversation</button>
+                    <button class="chat-tab-btn" id="tab-btn-logs" onclick="switchTab('logs')">Process Logs</button>
+                </div>
                 <div class="chat-header-status" id="chat-header-status">
                     <div class="status-dot" id="status-dot"></div>
                     <span id="status-text">Idle</span>
                 </div>
             </header>
 
-            <!-- Scrollable Message Viewport -->
-            <div class="message-viewport" id="message-viewport">
+            <!-- Scrollable Message Viewports -->
+            <div class="message-viewport" id="chat-viewport">
                 <!-- Filled dynamically by state triggers -->
                 <div class="msg-row agent">
                     <div class="msg-bubble">
@@ -788,6 +824,9 @@
                         Click a prompt below or start typing.
                     </div>
                 </div>
+            </div>
+            <div class="message-viewport" id="logs-viewport" style="display: none;">
+                <div style="text-align: center; color: var(--text-muted); margin-top: 40px; font-style: italic;" id="logs-empty-state">No process logs available for this conversation yet.</div>
             </div>
 
             <!-- Bottom input area -->
@@ -837,12 +876,12 @@
             </header>
 
             <!-- Task Board Area -->
-            <div class="dashboard-section" style="flex: 1; display: flex; flex-direction: column;">
+            <div class="dashboard-section" style="flex: 1; min-height: 0; display: flex; flex-direction: column;">
                 <div class="section-header">
                     <span>Task List (Swarm DAG)</span>
                     <span id="task-completion-ratio" style="font-size: 0.7rem; color: var(--text-muted);">0/0 Complete</span>
                 </div>
-                <div class="task-list" id="task-list" style="overflow-y: auto; flex: 1;">
+                <div class="task-list" id="task-list" style="overflow-y: auto; flex: 1; min-height: 0;">
                     <div style="font-size: 0.8rem; color: var(--text-muted); text-align: center; margin-top: 40px; font-style: italic;">
                         No subtasks generated yet. Start a session to initialize execution graph.
                     </div>
@@ -850,9 +889,9 @@
             </div>
 
             <!-- Session Facts Area -->
-            <div class="dashboard-section" style="height: 300px; border-bottom: none;">
+            <div class="dashboard-section" style="max-height: 280px; overflow: hidden; border-bottom: none; display: flex; flex-direction: column;">
                 <div class="section-header">Active Session Facts</div>
-                <div class="fact-list" id="fact-list">
+                <div class="fact-list" id="fact-list" style="overflow-y: auto; flex: 1;">
                     <div style="font-size: 0.75rem; color: var(--text-muted); font-style: italic; text-align: center; margin-top: 20px;">
                         No facts extracted in this turn.
                     </div>
@@ -873,7 +912,8 @@
         // Hydrate UI references
         const threadListEl = document.getElementById("thread-list");
         const newChatBtn = document.getElementById("new-chat-btn");
-        const messageViewport = document.getElementById("message-viewport");
+        const chatViewport = document.getElementById("chat-viewport");
+        const logsViewport = document.getElementById("logs-viewport");
         const inputBox = document.getElementById("input-box");
         const sendBtn = document.getElementById("send-btn");
         const activeThreadTitle = document.getElementById("active-thread-title");
@@ -962,7 +1002,7 @@
             loadActiveThreadState();
             
             // Clean viewports immediately
-            messageViewport.innerHTML = `
+            chatViewport.innerHTML = `
                 <div class="msg-row agent">
                     <div class="msg-bubble">
                         <h3>New Thread Initialized!</h3>
@@ -970,6 +1010,7 @@
                     </div>
                 </div>
             `;
+            logsViewport.innerHTML = `<div style="text-align: center; color: var(--text-muted); margin-top: 40px; font-style: italic;" id="logs-empty-state">No process logs available for this conversation yet.</div>`;
             taskListEl.innerHTML = `
                 <div style="font-size: 0.8rem; color: var(--text-muted); text-align: center; margin-top: 40px; font-style: italic;">
                     No subtasks generated yet.
@@ -1019,7 +1060,7 @@
                 if (response.status === 404) {
                     // Fresh state
                     setLoaderStatus(false, "Idle");
-                    messageViewport.innerHTML = `
+                    chatViewport.innerHTML = `
                         <div class="msg-row agent">
                             <div class="msg-bubble">
                                 <h3>Goal Orchestrator Ready</h3>
@@ -1027,8 +1068,9 @@
                             </div>
                         </div>
                     `;
+                    logsViewport.innerHTML = `<div style="text-align: center; color: var(--text-muted); margin-top: 40px; font-style: italic;" id="logs-empty-state">No process logs available for this conversation yet.</div>`;
                     taskListEl.innerHTML = `<div style="font-size: 0.8rem; color: var(--text-muted); text-align: center; margin-top: 20px;">No active subtasks generated.</div>`;
-                    fact_list.innerHTML = "";
+                    factListEl.innerHTML = "";
                     return;
                 }
                 
@@ -1036,7 +1078,7 @@
                 renderState(data);
             } catch (err) {
                 console.log("No active state loaded yet. Waiting for first chat execution.");
-                messageViewport.innerHTML = `
+                chatViewport.innerHTML = `
                     <div class="msg-row agent">
                         <div class="msg-bubble">
                             <h3>Welcome to SwarmAI!</h3>
@@ -1044,6 +1086,7 @@
                         </div>
                     </div>
                 `;
+                logsViewport.innerHTML = `<div style="text-align: center; color: var(--text-muted); margin-top: 40px; font-style: italic;" id="logs-empty-state">No process logs available for this conversation yet.</div>`;
             } finally {
                 setLoaderStatus(false, "Idle");
             }
@@ -1073,16 +1116,19 @@
         }
 
         function renderConversation(messages) {
-            messageViewport.innerHTML = "";
+            chatViewport.innerHTML = "";
+            logsViewport.innerHTML = "";
             
             let i = 0;
+            let hasLogs = false;
             while (i < messages.length) {
                 const msg = messages[i];
                 
                 // If it's a tool-related log, attempt to build collapsible structure rather than raw bubbles
                 if (isToolExecutionLog(msg.content)) {
+                    hasLogs = true;
                     const block = parseToolBlock(msg.content);
-                    messageViewport.appendChild(block);
+                    logsViewport.appendChild(block);
                 } else {
                     // Standard markdown message
                     const row = document.createElement("div");
@@ -1100,12 +1146,16 @@
                             ${formattedContent}
                         </div>
                     `;
-                    messageViewport.appendChild(row);
+                    chatViewport.appendChild(row);
                 }
                 i++;
             }
+            if (!hasLogs) {
+                logsViewport.innerHTML = `<div style="text-align: center; color: var(--text-muted); margin-top: 40px; font-style: italic;" id="logs-empty-state">No process logs available for this conversation yet.</div>`;
+            }
             // Auto scroll to bottom
-            messageViewport.scrollTop = messageViewport.scrollHeight;
+            chatViewport.scrollTop = chatViewport.scrollHeight;
+            logsViewport.scrollTop = logsViewport.scrollHeight;
         }
 
         function isToolExecutionLog(text) {
@@ -1165,6 +1215,25 @@
             block.classList.toggle("expanded");
         }
 
+        function switchTab(tabId) {
+            document.getElementById('tab-btn-chat').classList.remove('active');
+            document.getElementById('tab-btn-logs').classList.remove('active');
+            document.getElementById('chat-viewport').style.display = 'none';
+            document.getElementById('logs-viewport').style.display = 'none';
+            
+            if (tabId === 'chat') {
+                document.getElementById('tab-btn-chat').classList.add('active');
+                document.getElementById('chat-viewport').style.display = 'flex';
+                const cvp = document.getElementById('chat-viewport');
+                cvp.scrollTop = cvp.scrollHeight;
+            } else {
+                document.getElementById('tab-btn-logs').classList.add('active');
+                document.getElementById('logs-viewport').style.display = 'flex';
+                const lvp = document.getElementById('logs-viewport');
+                lvp.scrollTop = lvp.scrollHeight;
+            }
+        }
+
         function renderTaskBoard(tasks) {
             if (!tasks || tasks.length === 0) {
                 taskListEl.innerHTML = `<div style="font-size: 0.8rem; color: var(--text-muted); text-align: center; margin-top: 40px; font-style: italic;">No tasks generated.</div>`;
@@ -1217,8 +1286,8 @@
             const row = document.createElement("div");
             row.className = "msg-row user";
             row.innerHTML = `<div class="msg-bubble">${text}</div>`;
-            messageViewport.appendChild(row);
-            messageViewport.scrollTop = messageViewport.scrollHeight;
+            chatViewport.appendChild(row);
+            chatViewport.scrollTop = chatViewport.scrollHeight;
 
             setLoaderStatus(true, "Executing Multi-Agent Swarm...");
 
@@ -1248,7 +1317,7 @@
                         Failed to reach active LangGraph checkpointer. Verify FastAPI backend server is running on localhost.
                     </div>
                 `;
-                messageViewport.appendChild(errRow);
+                chatViewport.appendChild(errRow);
             } finally {
                 setLoaderStatus(false, "Idle");
             }
